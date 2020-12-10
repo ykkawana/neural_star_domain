@@ -1,0 +1,51 @@
+method: nsd
+data:
+  path: data/ShapeNet
+  img_folder: img_choy2016
+  img_size: 224 
+  points_subsample: 2048 
+  pointcloud_target_n: 4096
+  primitive_points_sample_n: 20 # will be powered by dim - 1, if dim == 3, then 900
+  is_normal_uv_sphere: true
+  uv_sphere_length: 20
+model:
+  encoder_latent: null
+  decoder: simplest
+  encoder: resnet18
+  c_dim: 256
+  z_dim: 0
+  decoder_kwargs:
+    n_primitives: 10
+    radius_decoder_class: PrimitiveWiseGroupConvDecoder
+    transformation_decoder_class: ParamNet
+trainer:
+  occupancy_loss_coef: 1
+  chamfer_loss_coef: 10
+  pnet_point_scale: 6
+  overlap_reg_threshold: 1.2
+  overlap_reg_coef: 10
+  overlap_logits_with_cvxnet_setting: true
+training:
+  out_dir:  out/img/nsd_n10
+  batch_size: 20
+  val_batch_size: 2
+  model_selection_metric: iou
+  model_selection_mode: maximize
+  visualize_every: 1000
+  validate_every: 2500
+  checkpoint_every: 10000
+  skip_load_pretrained_optimizer: false
+  learning_rate: 1e-4
+test:
+  threshold: 0.5
+  eval_mesh: true
+  eval_pointcloud: false
+generation:
+  batch_size: 100000
+  refine: false
+  n_x: 128
+  n_z: 1
+  resolution_0: 32 
+  upsampling_steps: 2
+  is_explicit_mesh: true
+

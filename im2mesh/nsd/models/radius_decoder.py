@@ -12,8 +12,7 @@ class PrimitiveWiseGroupConvDecoder(nn.Module):
                  output_dim,
                  factor=1,
                  dim=3,
-                 act='leaky',
-                 no_last_bias=False):
+                 act='leaky'):
         super().__init__()
         self.n_primitives = n_primitives
         self.output_dim = output_dim
@@ -37,8 +36,7 @@ class PrimitiveWiseGroupConvDecoder(nn.Module):
             primitive_wise_layers.PrimitiveWiseLinear(self.n_primitives,
                                                       c64,
                                                       self.output_dim,
-                                                      act='none',
-                                                      bias=(not no_last_bias)))
+                                                      act='none'))
 
     def forward(self, feature, thetas, radius, coord, *args, **kwargs):
         # B, 1 or N, P, dim - 1

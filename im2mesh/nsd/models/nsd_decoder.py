@@ -2,12 +2,12 @@ import torch
 from torch import nn
 from im2mesh.nsd.models import geometry_utils
 from im2mesh.nsd.models import radius_decoder
-from im2mesh.nsd.models import sphere_sampler
+from im2mesh.nsd.models import sphere_decoder
 
 EPS = 1e-7
 
 
-class PeriodicShapeSampler(sphere_sampler.SphereSampler):
+class NeuralStarDomainDecoder(sphere_decoder.SphereDecoder):
     def __init__(self,
                  num_points,
                  *args,
@@ -15,8 +15,6 @@ class PeriodicShapeSampler(sphere_sampler.SphereSampler):
                  factor=1,
                  act='leaky',
                  decoder_class='PrimitiveWiseGroupConvDecoder',
-                 no_last_bias=False,
-                 is_simpler_sgn=False,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.factor = factor
@@ -24,7 +22,6 @@ class PeriodicShapeSampler(sphere_sampler.SphereSampler):
         self.num_labels = 1
         self.theta_dim = 2 if self.dim == 2 else 4
         self.last_scale = last_scale
-        self.is_simpler_sgn = is_simpler_sgn
         self.act = act
 
         c64 = 64 // self.factor
@@ -37,8 +34,7 @@ class PeriodicShapeSampler(sphere_sampler.SphereSampler):
             self.num_labels,
             dim=self.dim,
             factor=self.factor,
-            act=self.act,
-            no_last_bias=no_last_bias)
+            act=self.act)
 
     def transform_circumference_angle_to_super_shape_world_cartesian_coord(
         self, thetas, radius, primitive_params, *args, points=None, **kwargs):
@@ -153,18 +149,9 @@ class PeriodicShapeSampler(sphere_sampler.SphereSampler):
         else:
             r1 = r1 + rp.squeeze(-1)
             r1 = r1.clamp(min=EPS)
-        if self.is_simpler_sgn:
-            denominator = r2
-        else:
-            denominator = ((r1**2) * (r2**2) * (phi.cos()**2) +
-                            (r2**2) * (phi.sin()**2)).clamp(min=EPS)
 
-        if self.is_simpler_sgn:
-            indicator = 1. - numerator.clamp(
-                min=EPS).sqrt() / denominator
-        else:
-            indicator = 1. - (numerator /
-                                denominator).clamp(min=EPS).sqrt()
+        indicator = 1. - (coord**2).sum(-1).clamp(
+            min=EPS).sqrt() / r2
 
         return indicator
 

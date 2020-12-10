@@ -46,7 +46,7 @@ def get_model(cfg, device=None, dataset=None, **kwargs):
         encoder = None
 
     p0_z = get_prior_z(cfg, device)
-    model = models.PeriodicShapeNetwork(decoder,
+    model = models.NeuralStarDomainNetwork(decoder,
                                         encoder,
                                         encoder_latent,
                                         p0_z,

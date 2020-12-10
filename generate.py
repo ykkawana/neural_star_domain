@@ -7,6 +7,7 @@ from tqdm import tqdm
 import time
 from collections import defaultdict
 import pandas as pd
+import numpy as np
 from im2mesh import config
 from im2mesh.checkpoints import CheckpointIO
 from im2mesh.utils.io import export_pointcloud
@@ -156,6 +157,11 @@ for it, data in enumerate(tqdm(test_loader)):
         mesh_out_file = os.path.join(mesh_dir, '%s.off' % modelname)
         mesh.export(mesh_out_file)
         out_file_dict['mesh'] = mesh_out_file
+
+        if mesh.vertex_attributes:
+            vertex_attrib_out_file = os.path.join(mesh_dir, '%s_vertex_attribtes.npz' % modelname)
+            np.savez(vertex_attrib_out_file, **mesh.vertex_attributes)
+            out_file_dict['vertex_attributes'] = vertex_attrib_out_file
 
     if generate_pointcloud:
         t0 = time.time()

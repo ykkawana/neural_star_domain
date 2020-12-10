@@ -6,7 +6,7 @@ import math
 EPS = 1e-7
 
 
-class BaseShapeSampler(nn.Module):
+class BaseShapeDecoder(nn.Module):
     def __init__(self,
                  n_primitives,
                  learn_pose=True,

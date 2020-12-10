@@ -1,13 +1,13 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from im2mesh.nsd.models import transformation_decoder, nsd_sampler
+from im2mesh.nsd.models import transformation_decoder, nsd_decoder
 import time
 
 EPS = 1e-7
 
 
-class PeriodicShapeDecoderSimplest(nn.Module):
+class NeuralStarDomain(nn.Module):
     ''' Decoder with CBN class 2.
 
     It differs from the previous one in that the number of blocks can be
@@ -28,27 +28,23 @@ class PeriodicShapeDecoderSimplest(nn.Module):
         c_dim=128,
         hidden_size=256,
         n_blocks=5,
-        max_m=4,
         n_primitives=6,
         shape_sampler_decoder_factor=1,
         is_shape_sampler_sphere=False,
         transition_range=3.,
-        paramnet_class='ParamNet',
-        paramnet_hidden_size=128,
-        paramnet_dense=True,
-        is_single_paramnet=False,
+        transformation_decoder_class='ParamNet',
+        transformation_decoder_hidden_size=128,
+        transformation_decoder_dense=True,
+        is_single_transformation_decoder=False,
         layer_depth=0,
         skip_position=3,  # count start from input fc
         is_skip=True,
-        shape_sampler_decoder_class='PrimitiveWiseGroupConvDecoder',
-        disable_learn_pose_but_transition=False,
+        radius_decoder_class='PrimitiveWiseGroupConvDecoder',
+        disable_learn_pose_but_transition=True,
         freeze_primitive=False,
-        no_last_bias=False,
         supershape_freeze_rotation_scale=False,
         get_features_from=[],
         concat_input_feature_with_pose_feature=False,
-        spherical_angles=False,
-        is_simpler_sgn=False,
         extract_surface_point_by_max=False,
         last_scale=.1):
         super().__init__()
@@ -57,15 +53,14 @@ class PeriodicShapeDecoderSimplest(nn.Module):
         self.concat_input_feature_with_pose_feature = concat_input_feature_with_pose_feature
 
         self.primitive = transformation_decoder.TransformationDecoder(
-            max_m,
             n_primitives,
             latent_dim=c_dim,
             train_logits=False,
             transition_range=transition_range,
-            paramnet_class=paramnet_class,
-            paramnet_hidden_size=paramnet_hidden_size,
-            paramnet_dense=paramnet_dense,
-            is_single_paramnet=is_single_paramnet,
+            transformation_decoder_class=transformation_decoder_class,
+            transformation_decoder_hidden_size=transformation_decoder_hidden_size,
+            transformation_decoder_dense=transformation_decoder_dense,
+            is_single_transformation_decoder=is_single_transformation_decoder,
             layer_depth=layer_depth,
             is_skip=is_skip,
             skip_position=skip_position,
@@ -77,22 +72,19 @@ class PeriodicShapeDecoderSimplest(nn.Module):
 
         if get_features_from:
             if concat_input_feature_with_pose_feature:
-                feature_dim = paramnet_hidden_size + c_dim
+                feature_dim = transformation_decoder_hidden_size + c_dim
             else:
-                feature_dim = paramnet_hidden_size
+                feature_dim = transformation_decoder_hidden_size
         else:
             feature_dim = c_dim
-        self.p_sampler = nsd_sampler.PeriodicShapeSampler(
+        self.p_sampler = nsd_decoder.NeuralStarDomainDecoder(
             feature_dim,
-            max_m,
             n_primitives,
             dim=dim,
             factor=shape_sampler_decoder_factor,
             last_scale=last_scale,
             disable_learn_pose_but_transition=disable_learn_pose_but_transition,
-            decoder_class=shape_sampler_decoder_class,
-            no_last_bias=no_last_bias,
-            is_simpler_sgn=is_simpler_sgn,
+            decoder_class=radius_decoder_class,
             extract_surface_point_by_max=extract_surface_point_by_max)
 
     def forward(self,

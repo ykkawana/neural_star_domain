@@ -65,6 +65,7 @@ class Trainer(BaseTrainer):
                  radius_reg_coef=1.,
                  use_surface_mask=True,
                  overlap_logits_with_cvxnet_setting=False,
+                 is_self_overlap_reg=False,
                  sgn_offset=0):
         self.model = model
         self.optimizer = optimizer
@@ -108,6 +109,7 @@ class Trainer(BaseTrainer):
         self.is_logits_by_relu_sum = is_logits_by_relu_sum
         self.is_logits_by_max_with_scale = is_logits_by_max_with_scale
         self.overlap_logits_with_cvxnet_setting = overlap_logits_with_cvxnet_setting
+        self.is_self_overlap_reg = is_self_overlap_reg
 
         if vis_dir is not None and not os.path.exists(vis_dir):
             os.makedirs(vis_dir)
@@ -528,13 +530,15 @@ class Trainer(BaseTrainer):
                                             -1)[:,
                                                 range(n_primitives),
                                                 range(n_primitives), :]
-        self_overlap_reg = torch.relu(bnnp_tsd_reshaped -
-                                      self.self_overlap_reg_threshold).mean()
 
         total_loss = (occupancy_loss * self.occupancy_loss_coef +
                       chamfer_loss * self.chamfer_loss_coef +
-                      overlap_reg * self.overlap_reg_coef +
-                      self_overlap_reg * self.self_overlap_reg_coef)
+                      overlap_reg * self.overlap_reg_coef)
+
+        if self.is_self_overlap_reg:
+            self_overlap_reg = torch.relu(bnnp_tsd_reshaped -
+                                        self.self_overlap_reg_threshold).mean()
+            total_loss = total_loss + self_overlap_reg * self.self_overlap_reg_coef
 
         if self.is_cvx_net_merged_loss:
             merged_loss = torch.topk(sgn,
@@ -558,9 +562,10 @@ class Trainer(BaseTrainer):
             'total_loss': total_loss,
             'occupancy_loss': occupancy_loss * self.occupancy_loss_coef,
             'chamfer_loss': chamfer_loss * self.chamfer_loss_coef,
-            'overlap_reg': overlap_reg * self.overlap_reg_coef,
-            'self_overlap_reg': self_overlap_reg * self.self_overlap_reg_coef
+            'overlap_reg': overlap_reg * self.overlap_reg_coef
         }
+        if self.is_self_overlap_reg:
+            losses.update({'self_overlap_reg': self_overlap_reg * self.self_overlap_reg_coef})
         if self.is_normal_loss or self.is_normal_loss_by_sgn_gradient or self.is_get_radius_direction_as_normals:
             losses.update({'normal_loss': normal_loss * self.normal_loss_coef})
         return losses

@@ -8,16 +8,15 @@ from im2mesh.layers import (ResnetBlockFC, CResnetBlockConv1d, CBatchNorm1d,
 class TransformationDecoder(nn.Module):
     def __init__(
         self,
-        max_m,
         n_primitives,
         latent_dim=100,
         train_logits=True,
-        use_paramnet=True,
-        paramnet_dense=True,
+        use_transformation_decoder=True,
+        transformation_decoder_dense=True,
         transition_range=1.,
-        paramnet_class='ParamNet',
-        paramnet_hidden_size=128,
-        is_single_paramnet=False,
+        transformation_decoder_class='ParamNet',
+        transformation_decoder_hidden_size=128,
+        is_single_transformation_decoder=False,
         layer_depth=0,
         skip_position=3,  # count start from input fc
         is_skip=True,
@@ -40,64 +39,63 @@ class TransformationDecoder(nn.Module):
         """
         super().__init__()
         self.n_primitives = n_primitives
-        self.max_m = max_m + 1
         self.train_logits = train_logits
         self.dim = dim
         self.transition_range = transition_range
         self.latent_dim = latent_dim
-        self.use_paramnet = use_paramnet
-        self.is_single_paramnet = is_single_paramnet
+        self.use_transformation_decoder = use_transformation_decoder
+        self.is_single_transformation_decoder = is_single_transformation_decoder
         self.get_features_from = get_features_from
 
         if get_features_from:
-            assert self.use_paramnet
+            assert self.use_transformation_decoder
 
         if not self.dim in [2, 3]:
             raise NotImplementedError('dim must be either 2 or 3.')
 
         self.rot_dim = 1 if self.dim == 2 else 4  # 1 for euler angle for 2D, 4 for quaternion for 3D
-        if self.is_single_paramnet:
-            assert not supershape_freeze_rotation_scale, 'supershape_freeze_rotation_scale doesnt support single paramnet'
-            self.paramnet = paramnet_dict[paramnet_class](
+        if self.is_single_transformation_decoder:
+            assert not supershape_freeze_rotation_scale, 'supershape_freeze_rotation_scale doesnt support single transformation_decoder'
+            self.transformation_decoder = transformation_decoder_dict[transformation_decoder_class](
                 self.n_primitives,
                 self.latent_dim,
                 self.dim + self.rot_dim + self.dim + 1,
-                hidden_size=paramnet_hidden_size,
+                hidden_size=transformation_decoder_hidden_size,
                 layer_depth=layer_depth,
-                dense=paramnet_dense)
+                dense=transformation_decoder_dense)
         else:
-            self.transition_net = paramnet_dict[paramnet_class](
+            self.transition_net = transformation_decoder_dict[transformation_decoder_class](
                 self.n_primitives,
                 self.latent_dim,
                 self.dim,
-                hidden_size=paramnet_hidden_size,
+                hidden_size=transformation_decoder_hidden_size,
                 layer_depth=layer_depth,
-                dense=paramnet_dense)
-            self.rotation_net = paramnet_dict[paramnet_class](
+                dense=transformation_decoder_dense)
+            self.rotation_net = transformation_decoder_dict[transformation_decoder_class](
                 self.n_primitives,
                 self.latent_dim,
                 self.rot_dim,
-                hidden_size=paramnet_hidden_size,
+                hidden_size=transformation_decoder_hidden_size,
                 layer_depth=layer_depth,
-                dense=paramnet_dense)
-            self.scale_net = paramnet_dict[paramnet_class](
+                dense=transformation_decoder_dense)
+            self.scale_net = transformation_decoder_dict[transformation_decoder_class](
                 self.n_primitives,
                 self.latent_dim,
                 self.dim,
-                hidden_size=paramnet_hidden_size,
+                hidden_size=transformation_decoder_hidden_size,
                 layer_depth=layer_depth,
-                dense=paramnet_dense)
+                dense=transformation_decoder_dense)
             if supershape_freeze_rotation_scale:
                 self.scale_net.requires_grad = False
                 self.rotation_net.requires_grad = False
 
-            self.prob_net = paramnet_dict[paramnet_class](
+            self.prob_net = transformation_decoder_dict[transformation_decoder_class](
                 self.n_primitives,
                 self.latent_dim,
                 1,
-                hidden_size=paramnet_hidden_size,
+                hidden_size=transformation_decoder_hidden_size,
                 layer_depth=layer_depth,
-                dense=paramnet_dense)
+                dense=transformation_decoder_dense)
 
         # Pose params
         # B=1, n_primitives, 2
@@ -113,7 +111,7 @@ class TransformationDecoder(nn.Module):
         # B=1, n_primitives
         self.prob = nn.Parameter(torch.Tensor(1, n_primitives, 1))
 
-        if self.use_paramnet:
+        if self.use_transformation_decoder:
             self.linear_scale.requires_grad = False
             self.transition.requires_grad = False
             self.rotation.requires_grad = False
@@ -133,8 +131,8 @@ class TransformationDecoder(nn.Module):
 
         params = {}
 
-        if self.use_paramnet and self.is_single_paramnet:
-            pose_param = self.paramnet(x)
+        if self.use_transformation_decoder and self.is_single_transformation_decoder:
+            pose_param = self.transformation_decoder(x)
 
             pointer = 0
             next_pointer = self.rot_dim
@@ -152,9 +150,9 @@ class TransformationDecoder(nn.Module):
             next_pointer = pointer + 1
             prob_param = pose_param[:, :, pointer:next_pointer]
 
-        if self.use_paramnet and not self.is_single_paramnet:
+        if self.use_transformation_decoder and not self.is_single_transformation_decoder:
             rotation = self.rotation + self.rotation_net(x)
-        elif self.use_paramnet and self.is_single_paramnet:
+        elif self.use_transformation_decoder and self.is_single_transformation_decoder:
             rotation = self.rotation + rotation_param
         else:
             rotation = self.rotation.repeat(B, 1, 1)
@@ -163,24 +161,24 @@ class TransformationDecoder(nn.Module):
         else:
             rotation = nn.functional.normalize(rotation, dim=-1)
 
-        if self.use_paramnet and not self.is_single_paramnet:
+        if self.use_transformation_decoder and not self.is_single_transformation_decoder:
             transition = self.transition + self.transition_net(x)
-        elif self.use_paramnet and self.is_single_paramnet:
+        elif self.use_transformation_decoder and self.is_single_transformation_decoder:
             transition = self.transition + transition_param
         else:
             transition = self.transition.repeat(B, 1, 1)
 
-        if self.use_paramnet and not self.is_single_paramnet:
+        if self.use_transformation_decoder and not self.is_single_transformation_decoder:
             linear_scale = self.linear_scale + self.scale_net(x)
-        elif self.use_paramnet and self.is_single_paramnet:
+        elif self.use_transformation_decoder and self.is_single_transformation_decoder:
             linear_scale = self.linear_scale + scale_param
         else:
             linear_scale = self.linear_scale.repeat(B, 1, 1)
         linear_scale = torch.tanh(linear_scale) + 1.1
 
-        if self.use_paramnet and not self.is_single_paramnet:
+        if self.use_transformation_decoder and not self.is_single_transformation_decoder:
             prob = self.prob + self.prob_net(x)
-        elif self.use_paramnet and self.is_single_paramnet:
+        elif self.use_transformation_decoder and self.is_single_transformation_decoder:
             prob = self.prob + prob_param
         else:
             prob = self.prob.repeat(B, 1, 1)
@@ -359,7 +357,7 @@ class ParamNetResNetBlockWOBatchNorm(nn.Module):
         return net
 
 
-paramnet_dict = {
+transformation_decoder_dict = {
     'ParamNet': ParamNet,
     'ParamNetResNetBlock': ParamNetResNetBlock,
     'ParamNetMLP': ParamNetMLP,

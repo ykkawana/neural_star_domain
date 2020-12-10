@@ -1,9 +1,9 @@
 import torch
-from im2mesh.nsd.models import base_shape_sampler
+from im2mesh.nsd.models import base_shape_decoder
 
 
-class SphereSampler(base_shape_sampler.BaseShapeSampler):
-    def __init__(self, max_m, *args, **kwargs):
+class SphereDecoder(base_shape_decoder.BaseShapeDecoder):
+    def __init__(self, *args, **kwargs):
         """Intitialize SuperShapeSampler.
 
         Args:

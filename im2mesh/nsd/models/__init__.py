@@ -10,11 +10,11 @@ encoder_latent_dict = {
 
 # Decoder dictionary
 decoder_dict = {
-    'simplest': decoder.PeriodicShapeDecoderSimplest,
+    'simplest': decoder.NeuralStarDomain,
 }
 
 
-class PeriodicShapeNetwork(nn.Module):
+class NeuralStarDomainNetwork(nn.Module):
     ''' Occupancy Network class.
 
     Args:
